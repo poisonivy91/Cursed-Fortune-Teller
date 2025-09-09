@@ -21,9 +21,9 @@ Judge-friendly: Clear setup, live demo, and short explainer
 
 🖼 Demo
 
-Live Site: add your Appwrite Sites URL here
+Live Site:(https://cursed-fortune-teller.appwrite.network/)
 
-Short Loom/YouTube: add a < 2-min walkthrough link here
+
 
 Screenshots:
 ![alt text](image.png)
