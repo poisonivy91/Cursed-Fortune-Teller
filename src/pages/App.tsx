@@ -38,10 +38,11 @@ function shuffle<T>(arr: T[]) {
 function App() {
   const [fortunes, setFortunes] = useState<Fortune[]>([]);
   const [order, setOrder]       = useState<number[]>([]);
-  const cursor                  = useRef(0);
+    const cursor                  = useRef(-1); // start at -1, nothing revealed
   const [fortune, setFortune]   = useState<Fortune | null>(null);
   const [manifest, setManifest] = useState<CardMeta[]>([]);
   const [byTitle, setByTitle]   = useState<Map<string, string>>(new Map());
+  const whisperRef = useRef<HTMLAudioElement>(null);
   const whisperKey = cursor.current;
 
   // Load manifest.json on app start
@@ -70,7 +71,7 @@ function App() {
       const savedSig = sessionStorage.getItem(SIG_KEY);
 
       let ord: number[] | null = null;
-      let cur = 0;
+    let cur = -1; // nothing revealed yet
 
       if (savedSig === sig) {
         try {
@@ -80,7 +81,7 @@ function App() {
             const parsed = JSON.parse(so) as number[];
             if (parsed.length === docs.length) {
               ord = parsed;
-              cur = Math.min(parseInt(sc, 10) || 0, parsed.length - 1);
+        cur = Math.min(parseInt(sc, 10) || -1, parsed.length - 1);
             }
           }
         } catch { /* ignore */ }
@@ -88,14 +89,14 @@ function App() {
 
       if (!ord) {
         ord = shuffle([...Array(docs.length).keys()]);
-        cur = 0;
+      cur = -1; // nothing revealed yet
         sessionStorage.setItem(SIG_KEY, sig);
       }
 
       setFortunes(docs);
       setOrder(ord);
       cursor.current = cur;
-      setFortune(docs[ord[cur]]);
+  setFortune(null); // do NOT reveal on load
     })();
   }, []);
 
@@ -121,11 +122,19 @@ function App() {
       setOrder(fresh);
       cursor.current = 0;
       setFortune(fortunes[fresh[0]]);
+        if (whisperRef.current) {
+          whisperRef.current.currentTime = 0;
+          whisperRef.current.play().catch(() => {});
+        }
       return;
     }
 
     cursor.current = next;
     setFortune(fortunes[order[next]]);
+      if (whisperRef.current) {
+        whisperRef.current.currentTime = 0;
+        whisperRef.current.play().catch(() => {});
+      }
   }
 
   return (
@@ -164,7 +173,33 @@ function App() {
             }} />
 
           <CrystalBall onClick={draw} />
-          <Whisper src={whisperSrc} triggerKey={whisperKey} />
+          <audio ref={whisperRef} src={whisperSrc} preload="auto" />
+
+          <div className={fortune ? "opacity-100 scale-100 transition-all duration-300" : "opacity-0 scale-95 pointer-events-none transition-all duration-300"}>
+            {fortune && (() => {
+              const rawTitle = (fortune.card ?? fortune.title ?? '').trim();
+              const rawSubtitle = (fortune.title ?? '').trim();
+              const title = rawTitle || rawSubtitle || 'Unknown';
+              const subtitle = fortune.body ?? '';
+              const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+              const fallback = `/cards/${slugify(title)}.svg`;
+              const img = byTitle.get(title.toLowerCase()) ?? fallback;
+              return (
+                <TarotCard
+                  title={title}
+                  subtitle={subtitle}
+                  image={img}
+                  reversed={Math.random() < 0.4}
+                />
+              );
+            })()}
+            {fortune && (
+              <div className="max-w-xl p-6 rounded-2xl bg-white/5 backdrop-blur border border-purple-300/30 shadow-neon">
+                <h3 className="text-2xl font-bold mb-2">{fortune.title}</h3>
+                <p className="leading-relaxed">{fortune.body}</p>
+              </div>
+            )}
+          </div>
 
           {fortune && (
             <div className="mt-10 grid place-items-center gap-6">
