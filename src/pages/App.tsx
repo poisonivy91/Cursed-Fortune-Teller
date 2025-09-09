@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import GlitchTitle from '../components/GlitchTitle'
 import CrystalBall from '../components/CrystalBall'
@@ -8,21 +8,41 @@ import TarotCard from "../components/TarotCard"
 
 const whisperSrc = '/spookymagic.mp3'
 
-type Fortune = {
-  id: string;
+interface Fortune {
+  $id: string;
   title: string;
-  message: string;
+  body?: string;
   card?: string;
-};
+}
 
-type CardMeta = { title: string; slug: string; file: string };
+interface CardMeta {
+  title: string;
+  slug: string;
+  file: string;
+}
 
-export default function App() {
-  const [fortune, setFortune] = useState<Fortune | null>(null);
-  const [draws, setDraws] = useState(0);
+const ORDER_KEY  = "cursed:order:v1";
+const CURSOR_KEY = "cursed:cursor:v1";
+const SIG_KEY    = "cursed:sig:v1";
+
+function shuffle<T>(arr: T[]) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const r = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
+    const j = Math.floor(r * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function App() {
+  const [fortunes, setFortunes] = useState<Fortune[]>([]);
+  const [order, setOrder]       = useState<number[]>([]);
+  const cursor                  = useRef(0);
+  const [fortune, setFortune]   = useState<Fortune | null>(null);
   const [manifest, setManifest] = useState<CardMeta[]>([]);
-  const [byTitle, setByTitle] = useState<Map<string, string>>(new Map());
-  const whisperKey = draws;
+  const [byTitle, setByTitle]   = useState<Map<string, string>>(new Map());
+  const whisperKey = cursor.current;
 
   // Load manifest.json on app start
   useEffect(() => {
@@ -31,7 +51,6 @@ export default function App() {
       const manifest: CardMeta[] = await res.json();
       setManifest(manifest);
       setByTitle(new Map(manifest.map(m => [m.title.toLowerCase(), `/cards/${m.file}`])));
-      // Preload images for snappy reveals
       manifest.forEach(m => {
         const img = new window.Image();
         img.src = `/cards/${m.file}`;
@@ -40,15 +59,73 @@ export default function App() {
     loadCardManifest();
   }, []);
 
+  // Load deck once and restore order/cursor if signature matches
+  useEffect(() => {
+    (async () => {
+      const res  = await databases.listDocuments(env.dbId, env.collectionId);
+      const docs = res.documents as unknown as Fortune[];
+      if (!docs?.length) return;
+
+      const sig = JSON.stringify(docs.map(d => d.$id)); // deck signature
+      const savedSig = sessionStorage.getItem(SIG_KEY);
+
+      let ord: number[] | null = null;
+      let cur = 0;
+
+      if (savedSig === sig) {
+        try {
+          const so = sessionStorage.getItem(ORDER_KEY);
+          const sc = sessionStorage.getItem(CURSOR_KEY);
+          if (so && sc) {
+            const parsed = JSON.parse(so) as number[];
+            if (parsed.length === docs.length) {
+              ord = parsed;
+              cur = Math.min(parseInt(sc, 10) || 0, parsed.length - 1);
+            }
+          }
+        } catch { /* ignore */ }
+      }
+
+      if (!ord) {
+        ord = shuffle([...Array(docs.length).keys()]);
+        cur = 0;
+        sessionStorage.setItem(SIG_KEY, sig);
+      }
+
+      setFortunes(docs);
+      setOrder(ord);
+      cursor.current = cur;
+      setFortune(docs[ord[cur]]);
+    })();
+  }, []);
+
+  // Persist order whenever it changes
+  useEffect(() => {
+    if (order.length) {
+      sessionStorage.setItem(ORDER_KEY, JSON.stringify(order));
+    }
+  }, [order]);
+
+  // Persist cursor on every reveal
+  useEffect(() => {
+    sessionStorage.setItem(CURSOR_KEY, String(cursor.current));
+  }, [fortune]);
+
   async function draw() {
-    // Fetch a random fortune from Appwrite
-    // Simple: listDocuments and pick randomly (small dataset). For large, add a "weight" or serverless function
-    const res = await databases.listDocuments(env.dbId, env.collectionId, [/* You can add queries here */]);
-    if (res.total === 0) return;
-    const idx = Math.floor(Math.random() * res.documents.length);
-    const doc: any = res.documents[idx];
-    setFortune({ id: doc.$id, title: doc.title, message: doc.message, card: doc.card });
-    setDraws(d => d + 1);
+    if (!fortunes.length || !order.length) return;
+
+    let next = cursor.current + 1;
+
+    if (next >= order.length) {
+      const fresh = shuffle(order);
+      setOrder(fresh);
+      cursor.current = 0;
+      setFortune(fortunes[fresh[0]]);
+      return;
+    }
+
+    cursor.current = next;
+    setFortune(fortunes[order[next]]);
   }
 
   return (
@@ -123,3 +200,5 @@ export default function App() {
     </div>
   );
 }
+
+export default App;
