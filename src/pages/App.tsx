@@ -176,56 +176,32 @@ function App() {
           <audio ref={whisperRef} src={whisperSrc} preload="auto" />
 
           <div className={fortune ? "opacity-100 scale-100 transition-all duration-300" : "opacity-0 scale-95 pointer-events-none transition-all duration-300"}>
-            {fortune && (() => {
-              const rawTitle = (fortune.card ?? fortune.title ?? '').trim();
-              const rawSubtitle = (fortune.title ?? '').trim();
-              const title = rawTitle || rawSubtitle || 'Unknown';
-              const subtitle = fortune.body ?? '';
-              const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
-              const fallback = `/cards/${slugify(title)}.svg`;
-              const img = byTitle.get(title.toLowerCase()) ?? fallback;
-              return (
-                <TarotCard
-                  title={title}
-                  subtitle={subtitle}
-                  image={img}
-                  reversed={Math.random() < 0.4}
-                />
-              );
-            })()}
             {fortune && (
-              <div className="max-w-xl p-6 rounded-2xl bg-white/5 backdrop-blur border border-purple-300/30 shadow-neon">
-                <h3 className="text-2xl font-bold mb-2">{fortune.title}</h3>
-                <p className="leading-relaxed">{fortune.body}</p>
+              <div className="grid place-items-center gap-6">
+                {(() => {
+                  const rawTitle = (fortune.card ?? fortune.title ?? '').trim();
+                  const rawSubtitle = (fortune.title ?? '').trim();
+                  const title = rawTitle || rawSubtitle || 'Unknown';
+                  const subtitle = fortune.body ?? '';
+                  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+                  const fallback = `/cards/${slugify(title)}.svg`;
+                  const img = byTitle.get(title.toLowerCase()) ?? fallback;
+                  return (
+                    <TarotCard
+                      title={title}
+                      subtitle={subtitle}
+                      image={img}
+                      reversed={Math.random() < 0.4}
+                    />
+                  );
+                })()}
+                <div className="max-w-xl p-6 rounded-2xl bg-white/5 backdrop-blur border border-purple-300/30 shadow-neon">
+                  <h3 className="text-2xl font-bold mb-2">{fortune.title}</h3>
+                  <p className="leading-relaxed">{fortune.body ?? fortune.message}</p>
+                </div>
               </div>
             )}
           </div>
-
-          {fortune && (
-            <div className="mt-10 grid place-items-center gap-6">
-              {(() => {
-                const rawTitle = (fortune.card ?? fortune.title ?? '').trim();
-                const rawSubtitle = (fortune.title ?? '').trim();
-                const title = rawTitle || rawSubtitle || 'Unknown';
-                const subtitle = rawSubtitle && rawSubtitle !== rawTitle ? rawSubtitle : '';
-                const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
-                const fallback = `/cards/${slugify(title)}.svg`;
-                const img = byTitle.get(title.toLowerCase()) ?? fallback;
-                return (
-                  <TarotCard
-                    title={title}
-                    subtitle={subtitle}
-                    image={img}
-                    reversed={Math.random() < 0.4}
-                  />
-                );
-              })()}
-              <div className="max-w-xl p-6 rounded-2xl bg-white/5 backdrop-blur border border-purple-300/30 shadow-neon">
-                <h3 className="text-2xl font-bold mb-2">{fortune.title}</h3>
-                <p className="leading-relaxed">{fortune.message}</p>
-              </div>
-            </div>
-          )}
         </section>
       </main>
 
